@@ -1,0 +1,5 @@
+# the following is the channel that the startline uses to communicate with external parts
+# external parts are e.g. extensions, the start timer clock, flag poles, .....
+# change this if you need to operate two lines within shouting range of each other
+pingchannel =                         #blank is the default channel
+
