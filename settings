@@ -1,4 +1,6 @@
-
+dbg=0              #dbg=1    say channel 0
+                         #dbg=2    shout DEBUG_CHANNEL
+                         #dbg=-nnnn    shout channel -nnnn
 # The format is key=value. #If the value is empty it takes the default value
 # '#' Is for comments
 
@@ -26,25 +28,18 @@ color-normal=                   # Set the color for Start Line paused. (vector) 
 displayname=1                #In the messages it says the legacy name (0) or the display name (1)
 alphaline=0.5                   #Transparency of the start line. Alpha value (1.0 solid  0.0 transparent  Default 0.5)
 menuoutregion=              #Sets whether the menu can be clicked outside the region  (1 Yes   0 No  Default: 0)
-laptimessay=                   #At the end of a race display at laps time  1 yes    0 no   (Default 0)
-                                        #When this is turned on the line has to do extra processing in a section of time
-                                        # critical code. Turning this on could cause a boat to be missed, 
-                                        #so use with caution.
+laptimessay=1                   #At the end of a race display at laps time  1 yes    0 no   (Default 0)
 startsay=                         #his is how the Start Line sends the start signal to the huds 
                                        #Usually broadcast to the entire region
                                        #But you can control if it is also broadcast outside the region
                                        #values   0 say region;  1 shout 100m;     2 both region and 100m       Default 0
+menutimeout=                 #is the time in seconds that the menu is disabled   0 never     Default 120                                       
 
 #LOCK
 autolock=                       #automatically locks when starting the race (1 is ON and 0 is OFF   Default is 1)
 autounlock=                   #automatically  unlocks when finish the race (1 is ON and 0 is OFF   Default is 1)
 autolocktime=                 #default auto lock time in MINUTES if autolock is activated  (default 30)
 autolocktype=               #autolock type  0 is softlock and 1 is hardlock  (Default is 1)
-
-#The next two keys are to make the left and right sides transparent for extensions
-#These keys only determine their visibility, the transparency value is taken from the main line
-visibleleft=                       #Make the left side visible or invisible (1 is visible and 0 is invisible   Default is 1)
-visibleright=                    #Make the right side visible or invisible (1 is visible and 0 is invisible   Default is 1)
 
 #OWNERS
 # Keys of the avatars that can set the default options and hard block the line. 

@@ -21,10 +21,10 @@
 
 integer dbg=0;
 integer model=0;    //0 es la normal   162 es la linea de 162 metros
-integer updtextChannel=       //***** Put channel, Communication channel with the design kit 
-integer channel=              //***** Put channel, The channel to listen for start, reset and miscellanous other commands for nav huds
-integer pingChannel=          //***** Put channel, the channel to listen for chronometers and others objects 
-integer region_relay_channel=0;     //Load from setting notecard this is where the line will relay information normally said in chat Default is 0 No relay information
+integer updtextChannel=-56784325;
+integer channel=-8001;       //The channel to listen for start, reset and miscellanous other commands for nav huds
+integer pingChannel=-2256845;   //the channel to listen for chronometers and others objects 
+integer region_relay_channel=0;  //this is where the line will relay information normally said in chat Default is 0 No relay information
 //Global Variables/////////////////////////////////////////////
 //read Notecard
 integer currentLine;
@@ -61,6 +61,7 @@ key  lockID=NULL_KEY;
 integer locktime=-1; //time (seconds) the lockout ends  -1 no block
 integer lockType=0;  //Block type  0 no block   1 soft block   2 hard block
 key unlockID=NULL_KEY;
+integer menutimeout=120;
 
 integer hr;
 integer mn;
@@ -69,12 +70,14 @@ string hms;
 
 //constants
 vector COLOR_WHITE=<1.0,1.0,1.0>;
+integer SIGN=1;  //face sign chrono
 integer COLON=3;  //face colon chrono
 
 //Links
-integer CENTERLINE=0;
 integer LEFTLINE=0;
 integer RIGHTLINE=0;
+integer LEFTARROW=0;
+integer RIGHTARROW=0;
 integer CHRONO=0;
 
 list tmp;
@@ -210,6 +213,10 @@ parseKeyValue(string pText)
         laptimessay=(integer)value;
         return;
     }
+    if (keystring=="menutimeout") {
+        menutimeout=(integer)value;
+        return;
+    }
     if (llGetSubString(keystring,0,4)=="color") {
         if (keystring=="color-set-chrono") {
             colorchrono=(integer)value;
@@ -256,13 +263,16 @@ getLinkNums()
 {
     integer i;
     integer linkcount=llGetNumberOfPrims();  
-    if (model==162) CENTERLINE=1;
     for (i=1;i<=linkcount;++i) {
         string str=llGetLinkName(i);
         if (str=="leftline") 
             LEFTLINE=i;
         else if (str=="rightline") 
             RIGHTLINE=i;
+        else if (str=="leftarrow") 
+            LEFTARROW=i;
+        else if (str=="rightarrow") 
+            RIGHTARROW=i;
         else if (str=="chrono") 
             CHRONO=i;
     }
@@ -270,7 +280,11 @@ getLinkNums()
 
 dbgSay(string text)
 {
-    if (dbg>0) llSay(0, text);
+    if(dbg!=0){ 
+        if(dbg==1) llSay(0, text);
+        else if(dbg==2) llShout(DEBUG_CHANNEL, text);
+        else if(dbg<0) llShout(dbg,text);
+    }
 }
 
 DisplayTime(integer sec_to_start)   
@@ -319,13 +333,11 @@ DisplayTime(integer sec_to_start)
     if (sw==1 && colorline==1) {
         llRegionSay(pingChannel,"colorext|"+(string)Color);
         if (visible) {
-            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,0,Color,alphaline,PRIM_COLOR,1,Color,alphaleft]);
-            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,0,Color,alphaline,PRIM_COLOR,1,Color,alpharight]);
-            if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,0,Color,alphaline,PRIM_COLOR,1,Color,0.0]);
+            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,ALL_SIDES,Color,alphaline,PRIM_COLOR,2,Color,0.0]);
+            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,ALL_SIDES,Color,alphaline,PRIM_COLOR,4,Color,0.0]);
         }else{
-            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,0,Color,0.0,PRIM_COLOR,1,Color,0.0]);
-            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,0,Color,0.0,PRIM_COLOR,1,Color,0.0]);
-            if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,0,Color,0.0,PRIM_COLOR,1,Color,0.0]);
+            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,ALL_SIDES,Color,0.0]);
+            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,ALL_SIDES,Color,0.0]);
         }
     }
 }
@@ -346,9 +358,8 @@ restart(key id)
     start_at=-1;
     last_tick=0;
     if (visible) {
-        if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,alphaleft]);
-        if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,alpharight]);
-        if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,0.0]);
+        if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,ALL_SIDES,colornormal,alphaline,PRIM_COLOR,2,colornormal,0.0]);
+        if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,ALL_SIDES,colornormal,alphaline,PRIM_COLOR,4,colornormal,0.0]);
     }
 }
 
@@ -370,45 +381,44 @@ setVisible(integer pvisible, integer pways)
     visible=pvisible;
     list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_COLOR,0]);
     vector c=llList2Vector(l,0);
-    float f=.0;
+    l=llGetLinkPrimitiveParams(LEFTARROW,[PRIM_COLOR,0]);
+    vector a=llList2Vector(l,0);
+    float f=0.0;
     if (pways!=0) f=1.0;
     if (visible) {
-        if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,0,c,alphaline,PRIM_COLOR,1,c,alphaleft,PRIM_COLOR,2,COLOR_WHITE,f]); 
-        if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,0,c,alphaline,PRIM_COLOR,1,c,alpharight,PRIM_COLOR,2,COLOR_WHITE,f]); 
-        if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,0,c,alphaline,PRIM_COLOR,1,c,0.0,PRIM_COLOR,2,COLOR_WHITE,f]); 
+        if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,ALL_SIDES,c,alphaline,PRIM_COLOR,2,c,0.0]); 
+        if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,ALL_SIDES,c,alphaline,PRIM_COLOR,4,c,0.0]); 
+        if (LEFTARROW>0) llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_COLOR,ALL_SIDES,a,f,PRIM_COLOR,2,a,0.0]); 
+        if (RIGHTARROW>0) llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_COLOR,ALL_SIDES,a,f,PRIM_COLOR,4,a,0.0]); 
         llSetLinkAlpha(CHRONO,1.0,ALL_SIDES);
     } else {
         if (LEFTLINE>0) llSetLinkAlpha(LEFTLINE,0.0,ALL_SIDES);
         if (RIGHTLINE>0) llSetLinkAlpha(RIGHTLINE,0.0,ALL_SIDES);
-        if (CENTERLINE>0) llSetLinkAlpha(CENTERLINE,0.0,ALL_SIDES);
+        if (LEFTARROW>0) llSetLinkAlpha(LEFTARROW,0.0,ALL_SIDES); 
+        if (RIGHTARROW>0) llSetLinkAlpha(RIGHTARROW,0.0,ALL_SIDES); 
         llSetLinkAlpha(CHRONO,0.0,ALL_SIDES);
     }    
 }
 
-setWays(integer ps)
+setWays(integer ps)  //-1=-Y  1=Y  0=both
 {
     list l;
     float f;
     if(ps==1) f=0.0;
     else if(ps==-1) f=PI;
     else { 
-        if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,2,COLOR_WHITE,0.0]); 
-        if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,2,COLOR_WHITE,0.0]);  
-        if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,2,COLOR_WHITE,0.0]);  
+        if (LEFTARROW>0) llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_COLOR,0,COLOR_WHITE,0.0]); 
+        if (RIGHTARROW>0) llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_COLOR,0,COLOR_WHITE,0.0]);  
     }
     if (ps!=0) {
         if (texarrow) {
-            if (LEFTLINE>0) { 
-                l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_TEXTURE,2]);
-                llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,2,COLOR_WHITE,visible,PRIM_TEXTURE,2,texarrow,llList2Vector(l,1),llList2Vector(l,2),f]);
+            if (LEFTARROW>0) { 
+                l=llGetLinkPrimitiveParams(LEFTARROW,[PRIM_TEXTURE,0]);
+                llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_COLOR,0,COLOR_WHITE,visible,PRIM_TEXTURE,0,texarrow,llList2Vector(l,1),llList2Vector(l,2),f]);
             }
-            if (RIGHTLINE>0) {         
-                l=llGetLinkPrimitiveParams(RIGHTLINE,[PRIM_TEXTURE,2]);
-                llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,2,COLOR_WHITE,visible,PRIM_TEXTURE,2,texarrow,llList2Vector(l,1),llList2Vector(l,2),f]);
-            }
-            if (CENTERLINE>0) {         
-                l=llGetLinkPrimitiveParams(CENTERLINE,[PRIM_TEXTURE,2]);
-                llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,2,COLOR_WHITE,visible,PRIM_TEXTURE,2,texarrow,llList2Vector(l,1),llList2Vector(l,2),f]);
+            if (RIGHTARROW>0) {         
+                l=llGetLinkPrimitiveParams(RIGHTARROW,[PRIM_TEXTURE,0]);
+                llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_COLOR,0,COLOR_WHITE,visible,PRIM_TEXTURE,0,texarrow,llList2Vector(l,1),llList2Vector(l,2),f]);
             }
         }
     }        
@@ -418,7 +428,7 @@ setWays(integer ps)
 inicio()
 {
     getTextures();
-    string s="config|"+(string)channel+"|"+(string)pingChannel+"|"+(string)setDName+"|"+(string)autolock+"|"+(string)lockTimeDef+"|"+(string)autolockType+"|"+(string)alphaline+"|"+(string)colornormal+"|"+(string)dbg+"|"+(string)region_relay_channel+"|"+(string)autounlock+"|"+(string)menuoutregion+"|"+(string)laptimessay;
+    string s="config|"+(string)channel+"|"+(string)pingChannel+"|"+(string)setDName+"|"+(string)autolock+"|"+(string)lockTimeDef+"|"+(string)autolockType+"|"+(string)alphaline+"|"+(string)colornormal+"|"+(string)dbg+"|"+(string)region_relay_channel+"|"+(string)autounlock+"|"+(string)menuoutregion+"|"+(string)laptimessay+"|"+(string)menutimeout;
     integer n=llGetListLength(owners);
     string ss="";
     while (n>0) {
@@ -427,14 +437,14 @@ inicio()
         n--;
     }
     llMessageLinked(LINK_THIS, 0, s, ss);  //send note options
+    llMessageLinked(LINK_ALL_OTHERS,region_relay_channel,"config","");
     owners=[];
     if (visibleleft==1) alphaleft=alphaline;
     else alphaleft=0.0;
     if (visibleright==1) alpharight=alphaline;
     else alpharight=0.0;
-    if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,alphaleft,PRIM_COLOR,2,COLOR_WHITE,1.0,PRIM_COLOR,3,COLOR_WHITE,0.0]); 
-    if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,alpharight,PRIM_COLOR,2,COLOR_WHITE,1.0,PRIM_COLOR,3,COLOR_WHITE,0.0]); 
-    if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(CENTERLINE,[PRIM_COLOR,0,colornormal,alphaline,PRIM_COLOR,1,colornormal,0.0,PRIM_COLOR,2,COLOR_WHITE,1.0]); 
+    if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_COLOR,ALL_SIDES,colornormal,alphaline,PRIM_COLOR,2,colornormal,0.0]); 
+    if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_COLOR,ALL_SIDES,colornormal,alphaline,PRIM_COLOR,4,colornormal,0.0]); 
 
     dbgSay(llGetScriptName()+"  "+(string)llGetFreeMemory());
     
@@ -444,16 +454,18 @@ inicio()
     llRegionSay(pingChannel,"colorsline"+s);
 }
 
-updateTextures(string t1, string t2, string t3, string t4, string ls, string as)  //Title, Clock numbers, Line, Arrows, line scale, arrow scale   Textures
+updateTextures(string t1, string t2, string t3, string t4, string t5, string ls, string as)  //Title, Clock numbers, mode, Line, Arrows, line scale, arrow scale   Textures
 {
     string s2="";
-    string s4="";  
+    string s3="";
+    string s5="";  
     integer nls=1;
     integer nas=1;
     t1=llStringTrim(t1, STRING_TRIM); 
     t2=llStringTrim(t2, STRING_TRIM); 
     t3=llStringTrim(t3, STRING_TRIM); 
     t4=llStringTrim(t4, STRING_TRIM); 
+    t5=llStringTrim(t5, STRING_TRIM); 
     key k;
     if (t1!="") {
         k=(key)t1;
@@ -468,26 +480,31 @@ updateTextures(string t1, string t2, string t3, string t4, string ls, string as)
     }
     if (t3!="") {
         k=(key)t3;
-        if (k) {
-            nls=(integer)ls;
-            if(nls<1 || nls>20) nls=1;
-            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_TEXTURE,0,k,<nls,1.0,0.0>,<0.0,0.0,0.0>,0.0,PRIM_TEXTURE,1,k,<nls,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
-            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_TEXTURE,0,k,<nls,1.0,0.0>,<0.0,0.0,0.0>,0.0,PRIM_TEXTURE,1,k,<nls,1.0,0.0>,<0.0,0.0,0.0>,0.0]);
-            if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_TEXTURE,0,k,<nls,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
-        }
+        if (k){ 
+            s3=t3;
+            llSetLinkPrimitiveParamsFast(CHRONO,[PRIM_TEXTURE,3,k,<1.0,1.0,0.0>,<0.0,0.0,0.0>,0.0]);   
+        } 
     }
     if (t4!="") {
         k=(key)t4;
         if (k) {
-            nas=(integer)as;
-            if(nas<1 || nas>20) nas=1;
-            s4=t4;
-            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_TEXTURE,2,k,<nas,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
-            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_TEXTURE,2,k,<nas,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
-            if (CENTERLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_TEXTURE,2,k,<nas,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
+            nls=(integer)ls;
+            if(nls<1 || nls>20) nls=1;
+            if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_TEXTURE,0,k,<nls,0.33333,0.0>,<0.0,0.16800,0.0>,0.0,PRIM_TEXTURE,1,k,<nls,0.16667,0.0>,<0.0,-0.08200,0.0>,0.0,PRIM_TEXTURE,3,k,<-nls,-0.16667,0.0>,<0.0,0.41801,0.0>,0.0,PRIM_TEXTURE,5,k,<nls,0.33333,0.0>,<0.0,-0.33201,0.0>,0.0]);    
+            if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_TEXTURE,0,k,<nls,0.33333,0.0>,<0.0,0.16800,0.0>,0.0,PRIM_TEXTURE,1,k,<nls,0.16667,0.0>,<0.0,-0.08200,0.0>,0.0,PRIM_TEXTURE,3,k,<-nls,-0.16667,0.0>,<0.0,0.41801,0.0>,0.0,PRIM_TEXTURE,5,k,<nls,0.33333,0.0>,<0.0,-0.33201,0.0>,0.0]);       
         }
     }
-    if (s2!="" || s4!="") {
+    if (t5!="") {
+        k=(key)t5;
+        if (k) {
+            nas=(integer)as;
+            if(nas<1 || nas>20) nas=1;
+            s5=t5;
+            if (LEFTARROW>0) llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_TEXTURE,0,k,<nas,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
+            if (RIGHTARROW>0) llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_TEXTURE,0,k,<nas,1.0,0.0>,<0.0,0.0,0.0>,0.0]);    
+        }
+    }
+    if (s2!="" || s3!="" || s5!="") {
         list li=llGetLinkPrimitiveParams(CHRONO,[PRIM_DESC]);
         string desc=llList2String(li,0);
         li=llParseString2List(desc,["#"],[]);
@@ -495,12 +512,13 @@ updateTextures(string t1, string t2, string t3, string t4, string ls, string as)
         integer i;
         string t1="";
         string t2="";
+        string t3="";
         for (i=0;i<n;i++) {
             if (llGetSubString(llList2String(li,i),0,1)=="t1") t1=llList2String(li,i);
             if (llGetSubString(llList2String(li,i),0,1)=="t2") t2=llList2String(li,i);
         }
         if (s2!="") t1="t1="+s2;        
-        if (s4!="") t2="t2="+s4;        
+        if (s5!="") t2="t2="+s5;        
         n=llSubStringIndex(desc,"#t");
         string desc0;
         if(n>0) desc0=llGetSubString(desc,0,n-1);
@@ -508,8 +526,16 @@ updateTextures(string t1, string t2, string t3, string t4, string ls, string as)
         else desc0=desc;
         desc=desc0+"#"+t1+"#"+t2;
         llSetLinkPrimitiveParams(CHRONO,[PRIM_DESC,desc]);
-        if (s2!="") llMessageLinked(LINK_ALL_CHILDREN, 0, "updtextchrono|"+s2, NULL_KEY);
-        if (s4!="") texarrow=(key)s4;
+
+        li=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_DESC]);
+        desc=llList2String(li,0);
+        n=llSubStringIndex(desc,"t3=");
+        if(n>=0) t3=desc;
+        if(s3!="") t3="t3="+s3; 
+        if(t3!="") llSetLinkPrimitiveParams(LEFTLINE,[PRIM_DESC,t3]);
+
+        if (s2!="" || s3!="") llMessageLinked(LINK_ALL_CHILDREN,0,"updtextchrono",s2+"|"+s3);
+        if (s5!="") texarrow=(key)s5;
     }
 }
 
@@ -520,24 +546,25 @@ getTextures()
         l=llParseString2List(desc,["#"],[]);
         integer n=llGetListLength(l);
         integer i;
-        string t1=NULL_KEY;
-        string t2=NULL_KEY;
+        key t1=NULL_KEY;
+        key t2=NULL_KEY;
+        key t3=NULL_KEY;
         for (i=0;i<n;i++) {
             if (llGetSubString(llList2String(l,i),0,1)=="t1") t1=(key)llGetSubString(llList2String(l,i),3,-1);
             if (llGetSubString(llList2String(l,i),0,1)=="t2") t2=(key)llGetSubString(llList2String(l,i),3,-1);
         }
-        l=llGetLinkPrimitiveParams(CHRONO,[PRIM_TEXTURE,COLON]);
+        l=llGetLinkPrimitiveParams(CHRONO,[PRIM_TEXTURE,SIGN]);
         key k=llList2Key(l,0);
-        if (k) t1=k;
-        else if (t1) t1=t1;
+        if(k) t1=k;
+        else if(t1) t1=t1;
         else llSay(0,"Display numbers texture is not available, load default textures");
 
-        l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_TEXTURE,2]);
+        l=llGetLinkPrimitiveParams(LEFTARROW,[PRIM_TEXTURE,0]);
         k=llList2Key(l,0);
-        if (k) t2=k;
-        else if (t2) t2=t2;
+        if(k) t2=k;
+        else if(t2) t2=t2;
         else llSay(0,"Arrow texture is not available, load default textures");
-        
+
         n=llSubStringIndex(desc,"#t");
         string desc0;
         if(n>0) desc0=llGetSubString(desc,0,n-1);
@@ -546,8 +573,20 @@ getTextures()
         desc=desc0+"#t1="+(string)t1+"#t2="+(string)t2;
         llSetLinkPrimitiveParams(CHRONO,[PRIM_DESC,desc]);
 
-        if (t1) llMessageLinked(LINK_ALL_CHILDREN, 0, "updtextchrono|"+(string)t1, NULL_KEY);
-        if (t2) texarrow=t2;
+        l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_DESC]);
+        desc=llList2String(l,0);
+        n=llSubStringIndex(desc,"t3=");
+        if(n>=0) t3=(key)llGetSubString(desc,n+3,-1);
+        l=llGetLinkPrimitiveParams(CHRONO,[PRIM_TEXTURE,COLON]);
+        k=llList2Key(l,0);
+        if(k) t3=k;
+        else if(t3) t3=t3;
+        else llSay(0,"Mode texture is not available, load default textures");
+        desc="t3="+(string)t3;
+        llSetLinkPrimitiveParams(LEFTLINE,[PRIM_DESC,desc]);
+
+        llMessageLinked(LINK_ALL_CHILDREN,0,"updtextchrono",(string)t1+"|"+(string)t3);
+        if(t2) texarrow=t2;
 }
 
 default 
@@ -567,8 +606,8 @@ default
                 dbgSay("receive update texture answer");
                 if(llGetListLength(l)<7) llRegionSayTo(listenKey,0,"Designer Kit wrong configuration");
                 else { 
-                    updateTextures(llList2String(l,1),llList2String(l,2),llList2String(l,3),llList2String(l,4),llList2String(l,5),llList2String(l,6));
-                    llRegionSay(pingChannel,"updtextext|"+llList2String(l,1)+"|"+llList2String(l,2)+"|"+llList2String(l,3)+"|"+llList2String(l,4)+"|"+llList2String(l,5)+"|"+llList2String(l,6));
+                    updateTextures(llList2String(l,1),llList2String(l,2),llList2String(l,3),llList2String(l,4),llList2String(l,5),llList2String(l,6),llList2String(l,7));
+                    llRegionSay(pingChannel,"updtextext|"+llList2String(l,1)+"|"+llList2String(l,2)+"|"+llList2String(l,3)+"|"+llList2String(l,4)+"|"+llList2String(l,5)+"|"+llList2String(l,6)+"|"+llList2String(l,7));
                     llRegionSayTo(listenKey,0,"Updated textures");
                 }
                 llListenRemove(listenHandle);

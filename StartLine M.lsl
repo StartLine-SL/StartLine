@@ -19,7 +19,7 @@
 //=====================================================================================
 //About this script - StartLine M
 
-integer dbg=0;
+integer dbg=0; 
 
 //Global Variables/////////////////////////////////////////////
 //settings prog
@@ -28,12 +28,11 @@ integer raceNumLaps=1;
 integer ways=0; //-1 -Y; +1 +Y; 0 Both
 
 integer channel;
-integer pingChannel; //the channel to listen for chronometers and others objects, It is loaded from the StartLine Aux script
-integer region_relay_channel=0;  //It is loaded from the StartLine Aux script
+integer pingChannel;
+integer region_relay_channel=0;
 integer setDName;
 integer laptimessay;
 
-integer lapNum=0;   //this is the number of laps in the race
 key  lockID=NULL_KEY;
 integer locktime=0;
 integer SEND=0;
@@ -184,6 +183,8 @@ handle_crossing(string list_argument) {
     integer listIdx=llListFindList(ownerList,[(string)ownerKey+raceID]);
     integer lapTime;
     string msg;
+    integer lapNum;
+
     
     if (listIdx==-1) { //not in list... will add to list if not over early
         dbgSay("Didn't find racer "+ownerName+" in list. Adding him/her");
@@ -207,6 +208,7 @@ handle_crossing(string list_argument) {
                 timeList=llListReplaceList(timeList,[raceTimeRel],listIdx,listIdx); //update race time for this racer
                 //add 
                 allLapsList+=["r"+(string)listIdx,lapNum,lapTime];
+                if(laptimessay) llMessageLinked(LINK_ALL_OTHERS, listIdx, "lapsadd", (string)lapNum+"|"+(string)lapTime);
                 if (lapNum==raceNumLaps) {
                     if (llListFindList(finishList,[listIdx])==-1) finishList+=listIdx;
                     string snumorder=(string)llGetListLength(finishList);
@@ -219,6 +221,11 @@ handle_crossing(string list_argument) {
                     } else {
                         msg="#"+snumorder+": "+ownerDName+"  ID"+raceID+"!  Race time: "+sec2hhmmss(raceTimeRel);
                     }
+                    if(laptimessay){ 
+                        llMessageLinked(LINK_ALL_OTHERS, listIdx, "lapssay", (string)raceNumLaps+"|"+msg);
+                        msg="";
+                    }
+/*
                     if(laptimessay){
                         string s="\nLap times";
                         integer idx;
@@ -233,13 +240,16 @@ handle_crossing(string list_argument) {
                         }
                         msg+=s;
                     }
+*/                    
                     llShout(channel,"avend|"+(string)ownerKey+"|"+raceID+"|"+snumorder+"|"+(string)lapTime+"|"+(string)raceTimeRel);
                 } else {
-                    msg=ownerDName+"  ID"+raceID+": "+(string)lapNum+" lap(s) completed at time "+sec2hhmmss(lapTime)+"/"+sec2hhmmss(raceTimeRel);
+                    msg=ownerDName+"  ID"+raceID+": "+(string)lapNum+" lap(s) completed at time "+sec2hhmmss(lapTime)+" -- Laptime is "+sec2hhmmss(raceTimeRel);
                     llShout(channel,"avlap|"+(string)ownerKey+"|"+raceID+"|"+(string)lapNum+"|"+(string)lapTime+"|"+(string)raceTimeRel);
                 }
-                llShout(0,"/me : "+msg); 
-                if(region_relay_channel!=0) llRegionSay(region_relay_channel, msg);
+                if(msg!=""){
+                    llShout(0,"/me : "+msg); 
+                    if(region_relay_channel!=0) llRegionSay(region_relay_channel, msg);
+                }
             } else {
                 dbgSay("Racer "+ownerName+" is already finished");
             }
@@ -260,13 +270,18 @@ addRacer(string ownername, key owner, integer startTimeRel, integer startTimeAbs
     ownerList+=[(string)owner+raceID];
     nameList+=ownername+" "+raceID;
     allLapsList+=["r"+(string)listIdx,0,startTimeRel];
+    if(laptimessay) llMessageLinked(LINK_ALL_OTHERS, listIdx, "lapsadd","0|"+(string)startTimeRel);
     //llMessageLinked(LINK_THIS, 9, "start|"+name+"|"+(string)startTimeRel+"|"+(string)startTimeAbs+"|"+boatType+"|"+raceID, NULL_KEY);
 }
 //<-Register Block
 
 dbgSay(string text)
 {
-    if (dbg>0) llSay(0, text);
+    if(dbg!=0){ 
+        if(dbg==1) llSay(0, text);
+        else if(dbg==2) llShout(DEBUG_CHANNEL, text);
+        else if(dbg<0) llShout(dbg,text);
+    }
 }
 
 
@@ -302,7 +317,8 @@ Start(integer argument)
     lapList=[];
     timeList=[];
     ownerList=[];
-    allLapsList=[];
+    allLapsList=[]; 
+    if(laptimessay) llMessageLinked(LINK_ALL_OTHERS, 0, "lapsini", "");   
     nameList=[];
     finishList=[];
     winnerFlag=FALSE;
@@ -331,13 +347,14 @@ Results()
     key ownerKey;
     integer i;
     integer y;
+    integer n=0;
     integer listIdx;
     integer len=llGetListLength(finishList);
     integer len2=llGetListLength(lapList);
     integer swSend=0;
     for (i=0;i<len;++i) {    //finished racers
         listIdx=llList2Integer(finishList,i);
-        line="\n"+(string)(i+1)+": ";
+        line="\n"+(string)(++n)+": ";
         line+=llList2String(nameList,listIdx)+" - Race Time: ";
         line+=sec2hhmmss(llList2Integer(timeList,listIdx));
         if(llStringLength(results+line)>1000) {
@@ -351,7 +368,7 @@ Results()
     len2=llGetListLength(lapList);
     for (i=0;i<len2;++i) {   //all racers
         if (llList2Integer(lapList,i)<raceNumLaps) {
-            line="\n"+(string)(len+i)+": ";
+            line="\n"+(string)(++n)+": ";
             line+=llList2String(nameList,i)+" - ";
             line+="Not Finished";
             if(llStringLength(results+line)>1000) {
@@ -421,7 +438,7 @@ Results()
         }
     }
     sayResults(swSend,results+"\n");
-    if (dbg==2){
+    if (dbg!=0){
         llSleep(0.5);
         dbgSay("-");
         dbgSay("lapList="+llDumpList2String(lapList, "|"));

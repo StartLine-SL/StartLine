@@ -23,7 +23,8 @@
 //Texture Parameters sign and numbers
 float charsize=0.25; //character width and height
 vector charscale=<1.0,1.0,0.0>; //scale character
-key tex;  //key texture
+key texnumbers;  //numbers texture
+key texmode;  //mode texture
 //faces number
 integer TITLE=0;
 integer SIGN=1;
@@ -93,12 +94,12 @@ displayTime(integer pmode, integer ptime) {
     n4=llSubStringIndex(SIMBOLS,(string)(seconds/10));
     n5=llSubStringIndex(SIMBOLS,(string)(seconds%10));
     llSetLinkPrimitiveParamsFast(LINK_THIS,[
-        PRIM_TEXTURE,SIGN,tex,charscale,<(n0%4)*charsize, (3-n0/4)*charsize,0.0>,0.0,
-        PRIM_TEXTURE,HOUR,tex,charscale,<(n1%4)*charsize, (3-n1/4)*charsize,0.0>,0.0,
-        PRIM_TEXTURE,MIN10,tex,charscale,<(n2%4)*charsize, (3-n2/4)*charsize,0.0>,0.0,
-        PRIM_TEXTURE,MIN1,tex,charscale,<(n3%4)*charsize, (3-n3/4)*charsize,0.0>,0.0,
-        PRIM_TEXTURE,SEC10,tex,charscale,<(n4%4)*charsize, (3-n4/4)*charsize,0.0>,0.0,
-        PRIM_TEXTURE,SEC1,tex,charscale,<(n5%4)*charsize, (3-n5/4)*charsize,0.0>,0.0
+        PRIM_TEXTURE,SIGN,texnumbers,charscale,<(n0%4)*charsize, (3-n0/4)*charsize,0.0>,0.0,
+        PRIM_TEXTURE,HOUR,texnumbers,charscale,<(n1%4)*charsize, (3-n1/4)*charsize,0.0>,0.0,
+        PRIM_TEXTURE,MIN10,texnumbers,charscale,<(n2%4)*charsize, (3-n2/4)*charsize,0.0>,0.0,
+        PRIM_TEXTURE,MIN1,texnumbers,charscale,<(n3%4)*charsize, (3-n3/4)*charsize,0.0>,0.0,
+        PRIM_TEXTURE,SEC10,texnumbers,charscale,<(n4%4)*charsize, (3-n4/4)*charsize,0.0>,0.0,
+        PRIM_TEXTURE,SEC1,texnumbers,charscale,<(n5%4)*charsize, (3-n5/4)*charsize,0.0>,0.0
     ]);
 }
 
@@ -126,7 +127,7 @@ default {
         displayChrono();
     }
     
-    link_message(integer sender_num,integer num,string str,key id) {
+    link_message(integer sender_num,integer num,string str,key data) {
         if(str=="init"){
             time=num;
             displayTime(0,time);
@@ -166,7 +167,11 @@ default {
             return;
         }
         if(llGetSubString(str,0,12)=="updtextchrono"){
-            tex=(key)llGetSubString(str,14,-1);
+            integer n=llSubStringIndex(data,"|");
+            if(n>0){
+                texnumbers=(key)llGetSubString(data,0,n-1);
+                texmode=(key)llGetSubString(data,n+1,-1);
+            }else texnumbers=data;
             displayTime(0,time);
         } 
     }

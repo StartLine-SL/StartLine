@@ -27,7 +27,7 @@
 integer dbg=0;
 integer model=0;    //0 normal line     162 162 meters line 
 string linename="StartLine";
-string version="1.0";
+string version="1.1";
 
 //minTime is used to prevent people from crossing, turning around,
 //and recrossing again without going around the course. it should be
@@ -50,6 +50,7 @@ integer autolockType;
 vector colornormal = <0.539,0.6679,1.0>;
 list owners;
 integer menuoutregion;
+integer menutimeout;
 
 integer nMenuTime;
 string  lockName="";
@@ -59,11 +60,12 @@ integer lockType=0;  //Block type  0 no block   1 soft block   2 hard block
 key unlockID=NULL_KEY;
 integer lockMode=0;  //0 manual lock   1 auto lock
 
-integer CENTERLINE=0;
 integer LEFTLINE=0;
 integer RIGHTLINE=0;
 integer CHRONO=0;
 integer SEND=0;
+integer LEFTARROW=0;
+integer RIGHTARROW=0;
 integer pingHandle;
 integer listenHandle;
 integer dialogChannel;
@@ -78,20 +80,27 @@ sendMsg(key k, string s)
 
 dbgSay(string text)
 {
-    if (dbg>0) llSay(0, text);
+    if(dbg!=0){ 
+        if(dbg==1) llSay(0, text);
+        else if(dbg==2) llShout(DEBUG_CHANNEL, text);
+        else if(dbg<0) llShout(dbg,text);
+    }
 }
 
 getLinkNums() 
 {
     integer i;
     integer linkcount=llGetNumberOfPrims();  
-    if (model==162) CENTERLINE=1;
     for (i=1;i<=linkcount;++i) {
         string str=llGetLinkName(i);
         if (str=="leftline") 
             LEFTLINE=i;
         else if (str=="rightline") 
             RIGHTLINE=i;
+        else if (str=="leftarrow") 
+            LEFTARROW=i;
+        else if (str=="rightarrow") 
+            RIGHTARROW=i;
         else if (str=="chrono") 
             CHRONO=i;
         else if (str==" ") 
@@ -156,9 +165,9 @@ string viewSettings()
 {
     string s="\n";
     s+="Num.Laps: "+(string)raceNumLaps+"\n";
-    if (ways==0) s+="Way: Both\n";
-    else if (ways==1) s+="Way: +Y\n";
-    else if (ways==-1) s+="Way: -Y\n";
+    if (ways==0) s+="Direction: Both\n";
+    else if (ways==1) s+="Direction: +Y\n";
+    else if (ways==-1) s+="Direction: -Y\n";
     s+="Countdown Time: "+sec2hms(set_time)+"\n";  
     if(visible==1) s+="Visible: ON\n";
     else s+="Visible: OFF\n";
@@ -199,155 +208,79 @@ DisplayMenu(key pId)
         }else{
             s="Visible";
         }
-        menu=[" ","Help","===>","CountD. Time",s,"MinLapTime","Results","Num.Laps","Ways","Close Menu","Start","Finish/Restart"];
+        menu=[" ","Help","===>","CountD. Time",s,"MinLapTime","Results","Num.Laps","Direction","Close Menu","Start","Finish/Restart"];
         s=viewSettings();
     }
     llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
+    if(menutimeout>0) nMenuTime=llGetUnixTime()+menutimeout;
 } 
 
-MenuOpt(key pId)
-{
-    list menu;
-    string s="Lock";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    if (lockType==1) { 
-        if (lockID==pId || llListFindList(owners,[pId])>=0) s="Unlock";
-    }
-    menu=["<===", s, "Owner Menu", "Close Menu", "Lock Time", "Load Default"];
-    llDialog(pId, viewSettings(), menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuOwner(key pId)
+SubMenu(string type, key pId)
 {
     list menu;
     llListenRemove(listenHandle);
     listenHandle = llListen(dialogChannel, "", "", "");
-    string s="";
-    if (model==0) s="Line Length";
-    menu=["Hard Lock",s,"Load Texture","Save Opt.","Reset","Unlock.","Up."];
-    llDialog(pId, viewSettings(), menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuHelp(key pId) 
-{
-    list menu;
     string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["Up","Help.","License"];
-    s=s+"Chose one option...";
+    if(type=="opt"){
+        s="Lock";
+        if (lockType==1) { 
+            if (lockID==pId || llListFindList(owners,[pId])>=0) s="Unlock";
+        } 
+        menu=["<===", s, "Owner Menu", "Close Menu", "Lock Time", "Load Default"];
+        s=viewSettings();
+    }else if(type=="owner"){
+        s="";
+        if (model==0) s="Line Length";
+        menu=["Hard Lock",s,"Load Texture","Save Opt.","Reset","Unlock.","Up."];
+        s=viewSettings();
+    }else if(type=="help"){
+        menu=["Up","Help.","License"];
+        s=s+"Chose one option...";
+    }else if(type=="linelength"){
+        list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
+        vector v=llList2Vector(l,0);
+        float n=v.x;
+        l=llGetLinkPrimitiveParams(RIGHTLINE,[PRIM_SIZE]);
+        v=llList2Vector(l,0);
+        n+=v.x;
+        menu=["90 m.","100 m.","107 m.","60 m.","70 m.","80 m.","30 m.","40 m.","50 m.","Up","Adjust"];
+        integer int1=llFloor(n);
+        integer int2=llRound(n*100.0)-(int1*100);
+        s=s+"The current line length is "+(string)int1+"."+(string)int2+" m.";
+    }else if(type=="adjustline"){
+        list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
+        vector v=llList2Vector(l,0);
+        float n=v.x;
+        l=llGetLinkPrimitiveParams(RIGHTLINE,[PRIM_SIZE]);
+        v=llList2Vector(l,0);
+        n+=v.x;
+        menu=["-","--","---","+","++","+++","Return"];
+        integer int1=llFloor(n);
+        integer int2=llRound(n*100.0)-(int1*100);
+        s=s+"The current line length is "+(string)int1+"."+(string)int2+" m.";
+    }else if(type=="laps"){
+        menu=["3 Laps","4 Laps","5 Laps","Up","1 Lap","2 Laps"];
+        s=s+"Chose one option...";
+    }else if(type=="time"){
+        menu=["3 min.","4 min.","5 min.","Up","1 min.","2 min."];
+        s=s+"The timer is set to "+sec2hms(set_time);
+    }else if(type=="minlaptime"){
+        menu=["90 sec.","150 sec.","210 sec.","Up","30 sec.","60 sec."];
+        s=s+"The minimum lap time is set to "+sec2hms(minTime);
+    }else if(type=="direction"){
+        string v;
+        if(ways==0) v="Both";
+        else if(ways==1) v="+Y";
+        else if(ways==-1) v="-Y";
+        menu=["+Y","-Y","Both","Up"];
+        s=s+"The Direction is set to "+v;
+    }else if(type=="locktime"){
+        menu=["60 min","90 min","120 min","Up.","30 min","45 min"];
+        s=s+"The lock time is set to "+sec2hms(setLockTime);
+    }    
     llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuLineLength(key pId)     //Length
-{
-    list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
-    vector v=llList2Vector(l,0);
-    float n=v.x*0.921875;
-    l=llGetLinkPrimitiveParams(RIGHTLINE,[PRIM_SIZE]);
-    v=llList2Vector(l,0);
-    n+=v.x*0.921875;
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["90 m.","100 m.","118 m.","60 m.","70 m.","80 m.","30 m.","40 m.","50 m.","Up","Adjust"];
-    integer int1=llFloor(n);
-    integer int2=llRound(n*100.0)-(int1*100);
-    s=s+"The current line length is "+(string)int1+"."+(string)int2+" m.";
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-
-MenuAdjustLine(key pId)     //Adjust Line
-{
-    list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
-    vector v=llList2Vector(l,0);
-    float n=v.x*0.921875;
-    l=llGetLinkPrimitiveParams(RIGHTLINE,[PRIM_SIZE]);
-    v=llList2Vector(l,0);
-    n+=v.x*0.921875;
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["-","--","---","+","++","+++","Return"];
-    integer int1=llFloor(n);
-    integer int2=llRound(n*100.0)-(int1*100);
-    s=s+"The current line length is "+(string)int1+"."+(string)int2+" m.";
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuLaps(key pId)
-{
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["3 Laps","4 Laps","5 Laps","Up","1 Lap","2 Laps"];
-    s=s+"Chose one option...";
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuTime(key pId)     //Countdown time
-{
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["3 min.","4 min.","5 min.","Up","1 min.","2 min."];
-    s=s+"The timer is set to "+sec2hms(set_time);
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
-
-MenuMinLapTime(key pId)
-{
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["90 sec.","150 sec.","210 sec.","Up","30 sec.","60 sec."];
-    s=s+"The minimum lap time is set to "+sec2hms(minTime);
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
+    if(menutimeout>0) nMenuTime=llGetUnixTime()+menutimeout;        
 }
-
-MenuWays(key pId)
-{
-    string v;
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    if(ways==0) v="Both";
-    else if(ways==1) v="+Y";
-    else if(ways==-1) v="-Y";
-    menu=["+Y","-Y","Both","Up"];
-    s=s+"The Ways is set to "+v;
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-}
-
-MenuLockTime(key pId)
-{
-    list menu;
-    string s="\n";
-    llListenRemove(listenHandle);
-    listenHandle = llListen(dialogChannel, "", "", "");
-    menu=["60 min","90 min","120 min","Up.","30 min","45 min"];
-    s=s+"The lock time is set to "+sec2hms(setLockTime);
-    llDialog(pId, s, menu,dialogChannel);
-    nMenuTime=llGetUnixTime()+60;
-} 
 //<== End Menu
 //==> setting options
 setVisible(integer p)
@@ -364,20 +297,23 @@ setVisible(integer p)
 
 lineLength(integer length)
 {
-    float n=length/2;
+    float n=length/2.0;
     list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
-    vector v=llList2Vector(l,0);
-    v.x=n/0.921875; 
-    float pos=(v.x/2.0)-(v.x*0.078126);
-    if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_SIZE,v,PRIM_POS_LOCAL,<-pos,0,0>]); 
-    if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_SIZE,v,PRIM_POS_LOCAL,<pos,0,0>]); 
+    vector vl=llList2Vector(l,0);
+    vl.x=n; 
+    l=llGetLinkPrimitiveParams(LEFTARROW,[PRIM_SIZE]);
+    vector va=llList2Vector(l,0);
+    va.x=n; 
+    n=n/2.0;   //position
+    float pz=vl.z/2+va.z/2; //pos z arrow
+    llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_SIZE,vl,PRIM_POS_LOCAL,<-n,0,0>]); 
+    llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_SIZE,vl,PRIM_POS_LOCAL,<n,0,0>]); 
+    llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_SIZE,va,PRIM_POS_LOCAL,<-n,0,pz>]); 
+    llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_SIZE,va,PRIM_POS_LOCAL,<n,0,pz>]); 
 }
 
 lineLengthAdjust(string cmd)
 {
-    list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
-    vector v=llList2Vector(l,0);
-    float n=v.x*0.921875;
     float inc=0;
     if(cmd=="-") inc=-0.5;
     else if(cmd=="--") inc=-1.0;
@@ -385,14 +321,23 @@ lineLengthAdjust(string cmd)
     else if(cmd=="+") inc=0.5;
     else if(cmd=="++") inc=1.0;
     else if(cmd=="+++") inc=3.0;
-    n+=inc/2.0;
+    list l=llGetLinkPrimitiveParams(LEFTLINE,[PRIM_SIZE]);
+    vector vl=llList2Vector(l,0);
+    float n=vl.x;  //actual length /2
+    n+=inc/2.0;    //new length /2
     n=llFloor(llRound(n*100.0))/100.0;
     if (n<4.0) n=4.0;
-    else if(n>59) n=59;
-    v.x=n/0.921875; 
-    float pos=llFabs(v.x/2.0)-(v.x*0.078126); 
-    if (LEFTLINE>0) llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_SIZE,v,PRIM_POS_LOCAL,<-pos,0,0>]); 
-    if (RIGHTLINE>0) llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_SIZE,v,PRIM_POS_LOCAL,<pos,0,0>]); 
+    else if(n>54) n=54;
+    vl.x=n; 
+    l=llGetLinkPrimitiveParams(LEFTARROW,[PRIM_SIZE]);
+    vector va=llList2Vector(l,0);
+    va.x=n;
+    n=n/2.0; //position
+    float pz=vl.z/2+va.z/2; //pos z arrow
+    llSetLinkPrimitiveParamsFast(LEFTLINE,[PRIM_SIZE,vl,PRIM_POS_LOCAL,<-n,0,0>]); 
+    llSetLinkPrimitiveParamsFast(RIGHTLINE,[PRIM_SIZE,vl,PRIM_POS_LOCAL,<n,0,0>]); 
+    llSetLinkPrimitiveParamsFast(LEFTARROW,[PRIM_SIZE,va,PRIM_POS_LOCAL,<-n,0,pz>]); 
+    llSetLinkPrimitiveParamsFast(RIGHTARROW,[PRIM_SIZE,va,PRIM_POS_LOCAL,<n,0,pz>]); 
 }
 
 Restart(key id)
@@ -419,6 +364,7 @@ Restart(key id)
 
 Start(key id)
 {
+    llMessageLinked(LINK_ALL_OTHERS,0,"name",llGetObjectName());
     integer now=llGetUnixTime();
     start_at=now+set_time;
     llMessageLinked(LINK_SET, start_at, "start", NULL_KEY);   
@@ -564,7 +510,7 @@ default
                     lockName="";
                     locktime=-1;
                     sendMsg(id, "The line is now unlocked");
-                    MenuOwner(id);
+                    SubMenu("owner",id);
                 }
                 return;
             }
@@ -581,12 +527,12 @@ default
             }
     
             if (cmd=="Up.") {
-                MenuOpt(id);
+                SubMenu("opt",id);
                 return;
             }
     
             if (cmd == "Num.Laps") {
-                MenuLaps(id);
+                SubMenu("laps",id);
                 return;
             }
     
@@ -599,7 +545,7 @@ default
             }
     
             if (cmd=="CountD. Time") {  //menu countdown time
-                MenuTime(id);
+                SubMenu("time",id);
                 return;
             }
     
@@ -612,7 +558,7 @@ default
     
             if (cmd == "MinLapTime") 
             { 
-                MenuMinLapTime(id);
+                SubMenu("minlaptime",id);
                 return;
             }
             if (llSubStringIndex(cmd,"sec.")>0) {   //MinLapTime
@@ -626,13 +572,13 @@ default
     
             if (cmd == "===>") 
             {
-                MenuOpt(id);
+                SubMenu("opt",id);
                 return;
             }
     
             if (cmd == "Help") 
             {
-                MenuHelp(id);
+                SubMenu("help",id);
                 return;
             }
             
@@ -668,7 +614,7 @@ default
             if(cmd=="Save Opt."){
                 saveOptions();
                 sendMsg(id,"Options have been saved");
-                MenuOwner(id);
+                SubMenu("owner",id);
                 return;
             }
             
@@ -682,8 +628,8 @@ default
                 return;
             }
     
-            if (cmd == "Ways") {
-                MenuWays(id);
+            if (cmd == "Direction") {
+                SubMenu("direction",id);
                 return;
             }
     
@@ -692,14 +638,14 @@ default
                 else if(cmd=="-Y") ways=-1;
                 else ways=0; 
                 sendopt();
-                sendMsg(id, "new way: "+cmd);
+                sendMsg(id, "new direction: "+cmd);
                 DisplayMenu(id);
                 return;
             }
     
             if (cmd == "Owner Menu") {
                 if (llListFindList(owners, [id])>=0) {
-                    MenuOwner(id);
+                    SubMenu("owner",id);
                     return;
                 } else {
                     sendMsg(id,"This option is for owners");
@@ -707,14 +653,14 @@ default
             }
     
             if (cmd == "Lock Time") {
-                MenuLockTime(id);
+                SubMenu("locktime",id);
                 return;
             }
             
             if (llGetSubString(cmd,-3,-1)=="min") {   //Lock Time
                 setLockTime=60*(integer)llGetSubString(cmd,0,-4);
                 sendMsg(id,"Lock time: "+sec2hms(setLockTime));
-                MenuOpt(id);
+                SubMenu("opt",id);
                 return;
             }
     
@@ -727,7 +673,7 @@ default
                     lockMode=0;  //manual lock
                     sendMsg(id,"StartLine locked by "+lockName+" for "+sec2hms(locktime-llGetUnixTime()));
                 } else sendMsg(id,"This line is locked, unlock it first before locking it again");     
-                MenuOpt(id);
+                SubMenu("opt",id);
                 return;
             }
     
@@ -740,41 +686,41 @@ default
                     lockMode=0;  //manual lock
                     sendMsg(id,"StartLine Hard locked by "+lockName+" for "+sec2hms(locktime-llGetUnixTime()));
                 } else sendMsg(id,"This line is locked, unlock it first before locking it again");     
-                MenuOwner(id);
+                SubMenu("owner",id);
                 return;
             }
     
             if (cmd == "Load Default") {
                 loadOptions(1);
                 sendMsg(id,"Default options have been loaded");
-                MenuOpt(id);
+                SubMenu("opt",id);
                 return;
             }
     
             if (cmd == "Line Length") {
-                if (model==0) MenuLineLength(id);
+                if (model==0) SubMenu("linelength",id);
                 return;
             }
     
             if (llGetSubString(cmd,-2,-1) == "m.") {
                 lineLength((integer)llGetSubString(cmd,0,2));
-                MenuOwner(id);
+                SubMenu("owner",id);
                 return;
             }
 
             if (cmd == "Return") {
-                MenuLineLength(id);
+                SubMenu("linelength",id);
                 return;
             }
 
             if (cmd == "Adjust") {
-                MenuAdjustLine(id);
+                SubMenu("adjustline",id);
                 return;
             }
             
             if (cmd=="-" || cmd=="--" || cmd=="---" || cmd=="+" || cmd=="++" || cmd=="+++") {
                 lineLengthAdjust(cmd);
-                MenuAdjustLine(id);
+                SubMenu("adjustline",id);
                 return;
             } 
 
@@ -818,6 +764,7 @@ default
             //region_relay_channel=(integer)llList2String(l,10);
             autounlock=(integer)llList2String(l,11);
             menuoutregion=(integer)llList2String(l,12);
+            menutimeout=(integer)llList2String(l,14);
             if (id!=""){
                 l=llParseString2List(id,["#"],[]);
                 integer n=llGetListLength(l);
@@ -828,16 +775,6 @@ default
                     n--;
                 }
             }
-/*
-            if (llList2String(l,14)!=""){
-                l=llParseString2List(llList2String(l,14),["#"],[]);
-                integer n=llGetListLength(l);
-                while (n>0) { 
-                    owners+=(key)llList2String(l,n-1);
-                    n--;
-                }
-            }
-*/            
             inicio();
             return;
         }        
