@@ -28,7 +28,6 @@ color-normal=                   # Set the color for Start Line paused. (vector) 
 displayname=1                #In the messages it says the legacy name (0) or the display name (1)
 alphaline=0.5                   #Transparency of the start line. Alpha value (1.0 solid  0.0 transparent  Default 0.5)
 menuoutregion=              #Sets whether the menu can be clicked outside the region  (1 Yes   0 No  Default: 0)
-laptimessay=1                   #At the end of a race display at laps time  1 yes    0 no   (Default 0)
 startsay=                         #his is how the Start Line sends the start signal to the huds 
                                        #Usually broadcast to the entire region
                                        #But you can control if it is also broadcast outside the region
@@ -44,7 +43,7 @@ autolocktype=               #autolock type  0 is softlock and 1 is hardlock  (De
 #OWNERS
 # Keys of the avatars that can set the default options and hard block the line. 
 # The owner is automatically added to the list
-owner=
-owner=
-owner=
-owner=
+admin=
+admin=
+admin=
+admin=
