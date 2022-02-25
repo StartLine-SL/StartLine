@@ -1,0 +1,69 @@
+#settins for StartLine v2.0
+
+dbg=-5000        #dbg=1    say channel 0
+                         #dbg=2    shout DEBUG_CHANNEL
+                         #dbg=-nnnn    shout channel -nnnn
+# The format is key=value. #If the value is empty it takes the default value
+# '#' Is for comments
+
+#CHANNELS
+# the following is the channel that the startline uses to communicate with external parts
+# external parts are e.g. extensions, the start timer clock, flag poles, .....
+# change this if you need to operate two lines within shouting range of each other (integer)
+pingchannel=            #empty is the default channel
+
+# this is where the line will relay information normally said in chat. should be a negative number
+region_relay_channel=                      #empty is Default, it is 0 No relay information
+
+
+#COLORS
+color-set-chrono=1           # set the color change on the chrono (1 is On and 0 is OFF   Default is 1)
+color-set-line=1                # set the color change on the line (1 is On and 0 is OFF   Default is 1)
+color+60=<0,0,1>            # Set the color for prestart time higher 60 seg. (vector)  Default is blue
+color-60=<1,1,0>              # Set the color for prestart time less 60 seg. (vector)  Default is yellow
+color-30=<1,0.5,0>           # Set the color for prestart time less 30 seg. (vector)  Default is orange
+color-10=<1,0,0>              # Set the color for prestart time less 10 seg. (vector)  Default is red
+color-start=<0,1,0>           # Set the color for start time. (vector)  Default is green
+color-normal=                   # Set the color for Start Line paused. (vector)  Default is light blue
+
+#OTHERS
+displayname=1                #In the messages it says the legacy name (0) or the display name (1)
+alphaline=0.5                   #Transparency of the start line. Alpha value (1.0 solid  0.0 transparent  Default 0.5)
+menuoutregion=              #Sets whether the menu can be clicked outside the region  (1 Yes   0 No  Default: 0)
+startsay=                         #his is how the Start Line sends the start signal to the huds 
+                                       #Usually broadcast to the entire region
+                                       #But you can control if it is also broadcast outside the region
+                                       #values   0 say region;  1 shout 100m;     2 both region and 100m       Default 0
+menutimeout=                 #is the time in seconds that the menu is disabled   0 never     Default 120      
+bright=                           #Brightens or dims the line 0-no glow 1-Brightens 2-Auto only during races  Default 2  
+nethud=                          #enabled/disabled hud detection to establish network    0-off   1-on    Default 1    
+
+#LOCK
+autolock=                       #automatically locks when starting the race (1 is ON and 0 is OFF   Default is 1)
+autounlock=                   #automatically  unlocks when finish the race (1 is ON and 0 is OFF   Default is 1)
+autolocktime=              #default auto lock time in MINUTES if autolock is activated  (default 30)
+autolocktype=               #autolock type  0 is softlock and 1 is hardlock  (Default is 1)
+
+#TEXTURES
+titletexture=                   #Title texture Key   
+numberstexture=            #Numbers texture Key 
+linetexture=                    #Line texture Key
+arrowtexture=                 #Arrows texture Key  
+modetexture=                #Mode texture Key
+linescale=                       #line scale default=3
+arrowscale=                     #arrow scale default=5
+titlehscale=                     #horizontal scale for title default=1
+titlevscale=                    #vertical scale for title default=1    
+
+#ADMINS
+# Keys of the avatars that can set the default options and hard block the line. 
+#You can put the ones you want, limited by memory. With more FREE memory the script works best
+# The owner is automatically added to the list
+admin=
+admin=
+admin=
+admin=
+
+
+
+
